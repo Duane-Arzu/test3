@@ -7,7 +7,7 @@ import (
 	"github.com/Duane-Arzu/test3.git/internal/data"
 )
 
-type contextKey strings
+type contextKey string
 
 const userContextKey = contextKey("user")
 
