@@ -6,13 +6,15 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/Duane-Arzu/test3/internal/data"
+	"github.com/Duane-Arzu/test3.git/internal/data"
+	"github.com/Duane-Arzu/test3.git/internal/mailer"
 	_ "github.com/lib/pq"
 )
 
-const appVersion = "8.0.0"
+const appVersion = "7.0.0"
 
 type serverConfig struct {
 	port        int
@@ -21,17 +23,29 @@ type serverConfig struct {
 		dsn string
 	}
 	limiter struct {
-		rps     float64
-		burst   int
-		enabled bool
+		rps     float64 // requests per second
+		burst   int     // initial requests possible
+		enabled bool    // enable or disable rate limiter
+	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
 	}
 }
 
 type applicationDependencies struct {
-	config       serverConfig
-	logger       *slog.Logger
-	productModel data.ProductModel
-	reviewModel  data.ReviewModel
+	config           serverConfig
+	logger           *slog.Logger
+	bookModel        data.BookModel
+	readingListModel data.ReadingListModel
+	reviewModel      data.ReviewModel
+	userModel        data.UserModel
+	mailer           mailer.Mailer
+	wg               sync.WaitGroup
+	tokenModel       data.TokenModel
 }
 
 func main() {
@@ -39,13 +53,23 @@ func main() {
 
 	flag.IntVar(&setting.port, "port", 4000, "Server port")
 	flag.StringVar(&setting.environment, "env", "development", "Environment (development|staging|production)")
-	flag.StringVar(&setting.db.dsn, "db-dsn", "postgres://products:darzu12@localhost/products?sslmode=disable", "PostgreSQL DSN")
+	flag.StringVar(&setting.db.dsn, "db-dsn", "postgres://test3:test3@localhost/test3?sslmode=disable", "PostgreSQL DSN")
 
 	flag.Float64Var(&setting.limiter.rps, "limiter-rps", 2, "Rate Limiter maximum requests per second")
 
 	flag.IntVar(&setting.limiter.burst, "limiter-burst", 5, "Rate Limiter maximum burst")
 
 	flag.BoolVar(&setting.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+
+	flag.StringVar(&setting.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
+	// We have port 25, 465, 587, 2525. If 25 doesn't work choose another
+	flag.IntVar(&setting.smtp.port, "smtp-port", 2525, "SMTP port")
+	// Use your Username value provided by Mailtrap
+	flag.StringVar(&setting.smtp.username, "smtp-username", "c3e1c1678d71c9", "SMTP username")
+
+	flag.StringVar(&setting.smtp.password, "smtp-password", "38d1f200e85005", "SMTP password")
+
+	flag.StringVar(&setting.smtp.sender, "smtp-sender", "Book Club Management Community <no-reply@commentscommunity.duanearzu.net>", "SMTP sender")
 
 	flag.Parse()
 
@@ -63,10 +87,15 @@ func main() {
 	logger.Info("Database connection pool established")
 
 	appInstance := &applicationDependencies{
-		config:       setting,
-		logger:       logger,
-		productModel: data.ProductModel{DB: db},
-		reviewModel:  data.ReviewModel{DB: db},
+		config:           setting,
+		logger:           logger,
+		userModel:        data.UserModel{DB: db},
+		bookModel:        data.BookModel{DB: db},
+		readingListModel: data.ReadingListModel{DB: db},
+		reviewModel:      data.ReviewModel{DB: db},
+		tokenModel:       data.TokenModel{DB: db},
+		mailer: mailer.New(setting.smtp.host, setting.smtp.port,
+			setting.smtp.username, setting.smtp.password, setting.smtp.sender),
 	}
 
 	err = appInstance.serve()

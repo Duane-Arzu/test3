@@ -2,13 +2,17 @@
 package validator
 
 import (
+	"regexp"
 	"slices"
 )
 
-// new type named Validator
+// We will create a new type named Validator
 type Validator struct {
 	Errors map[string]string
 }
+
+var EmailRX = regexp.MustCompile(
+	"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 // Construct a new Validator and return a pointer to it
 // All validation errors go into this one Validator instance
@@ -40,4 +44,8 @@ func (v *Validator) Check(acceptable bool, key string, message string) {
 
 func PermittedValue(value string, permittedValues ...string) bool {
 	return slices.Contains(permittedValues, value)
+}
+
+func Matches(value string, rx *regexp.Regexp) bool {
+	return rx.MatchString(value)
 }

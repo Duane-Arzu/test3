@@ -1,3 +1,4 @@
+// Filename: cmd/api/routes.go
 package main
 
 import (
@@ -14,25 +15,42 @@ func (a *applicationDependencies) routes() http.Handler {
 
 	router.MethodNotAllowed = http.HandlerFunc(a.methodNotAllowedResponse)
 
-	//Product part
-	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", a.healthcheckHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/product", a.listProductHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/product", a.createProductHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/product/:pid", a.displayProductHandler)
-	router.HandlerFunc(http.MethodPatch, "/v1/product/:pid", a.updateProductHandler)
-	router.HandlerFunc(http.MethodDelete, "/v1/product/:pid", a.deleteProductHandler)
+	// Books Section
+	// =============
+	router.HandlerFunc(http.MethodGet, "/api/v1/healthcheck", a.requireActivatedUser(a.healthcheckHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/books/:bid", a.requireActivatedUser(a.displayBookHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/books", a.requireActivatedUser(a.listBooksHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/book/search", a.requireActivatedUser(a.searchBookHandler))
+	router.HandlerFunc(http.MethodPost, "/api/v1/books", a.requireActivatedUser(a.createBookHandler))
+	router.HandlerFunc(http.MethodPatch, "/api/v1/books/:bid", a.requireActivatedUser(a.updateBookHandler))
+	router.HandlerFunc(http.MethodDelete, "/api/v1/books/:bid", a.requireActivatedUser(a.deleteBookHandler))
 
-	// //Review part
-	router.HandlerFunc(http.MethodGet, "/v1/review", a.listReviewHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/review", a.createReviewHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/review/:rid", a.displayReviewHandler)
-	router.HandlerFunc(http.MethodPatch, "/v1/review/:rid", a.updateReviewHandler)
-	router.HandlerFunc(http.MethodDelete, "/v1/review/:rid", a.deleteReviewHandler)
+	// Reading Lists Section
+	// =====================
+	router.HandlerFunc(http.MethodGet, "/api/v1/lists", a.requireActivatedUser(a.ReadinglistHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/lists/:lid", a.requireActivatedUser(a.displayReadingListHandler))
+	router.HandlerFunc(http.MethodPost, "/api/v1/lists", a.requireActivatedUser(a.createReadingListHandler))
+	router.HandlerFunc(http.MethodPatch, "/api/v1/lists/:lid", a.requireActivatedUser(a.updateReadingListHandler))
+	router.HandlerFunc(http.MethodDelete, "/api/v1/lists/:lid", a.requireActivatedUser(a.deleteReadingListHandler))
+	router.HandlerFunc(http.MethodPost, "/api/v1/lists/:lid/books", a.requireActivatedUser(a.addReadingListBookHandler))
+	router.HandlerFunc(http.MethodDelete, "/api/v1/lists/:lid/books", a.requireActivatedUser(a.RemoveReadingListBookHandler))
 
-	router.HandlerFunc(http.MethodGet, "/v1/product-review/:rid", a.listProductReviewHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/product/:pid/review/:rid", a.getProductReviewHandler)
-	router.HandlerFunc(http.MethodPatch, "/v1/helpful-count/:rid", a.HelpfulCountHandler)
+	// Review Section
+	// ==============
+	router.HandlerFunc(http.MethodPost, "/api/v1/books/:bid/reviews", a.requireActivatedUser(a.createReviewHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/books/:bid/reviews", a.requireActivatedUser(a.bookReviewsHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/books/:bid/reviews/:rid", a.requireActivatedUser(a.displayReviewHandler))
+	router.HandlerFunc(http.MethodPatch, "/api/v1/reviews/:rid", a.requireActivatedUser(a.updateReviewHandler))
+	router.HandlerFunc(http.MethodDelete, "/api/v1/reviews/:rid", a.requireActivatedUser(a.deleteReviewHandler))
 
-	return a.recoverPanic(a.rateLimit(router))
+	// Users Section
+	// =============
+	router.HandlerFunc(http.MethodPut, "/api/v1/users/activated", a.activateUserHandler)
+	router.HandlerFunc(http.MethodGet, "/api/v1/users/:uid", a.requireActivatedUser(a.listUserProfileHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/users/:uid/reviews", a.requireActivatedUser(a.getUserReviewsHandler))
+	router.HandlerFunc(http.MethodGet, "/api/v1/users/:uid/lists", a.requireActivatedUser(a.getUserListsHandler))
+	router.HandlerFunc(http.MethodPost, "/api/v1/tokens/authentication", a.createAuthenticationTokenHandler)
+	router.HandlerFunc(http.MethodPost, "/api/v1/users", a.registerUserHandler)
 
+	return a.recoverPanic(a.rateLimit(a.authenticate(router)))
 }

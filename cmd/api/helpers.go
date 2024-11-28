@@ -1,4 +1,3 @@
-// cmd/api/healthcheck.go
 package main
 
 import (
@@ -11,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Duane-Arzu/test3/internal/validator"
-	_ "github.com/Duane-Arzu/test3/internal/validator"
+	"github.com/Duane-Arzu/test3.git/internal/validator"
+
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -113,14 +112,13 @@ func (a *applicationDependencies) readJSON(w http.ResponseWriter,
 	return nil
 }
 
-func (a *applicationDependencies) readIDParam(r *http.Request, paramName string) (int64, error) {
+func (a *applicationDependencies) readIDParam(r *http.Request, sid string) (int64, error) {
+	//get the url parameters
 	params := httprouter.ParamsFromContext(r.Context())
-
-	// Fetch the parameter value by name
-	idStr := params.ByName(paramName)
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	//convert id from string to int
+	id, err := strconv.ParseInt(params.ByName(sid), 10, 64)
 	if err != nil || id < 1 {
-		return 0, errors.New("invalid " + paramName + " parameter")
+		return 0, errors.New("invalid ID parameter")
 	}
 
 	return id, nil
@@ -135,14 +133,14 @@ func (a *applicationDependencies) getSingleQueryParameter(queryParameters url.Va
 	return result
 }
 
-func (a *applicationDependencies) getMultipleQueryParameters(queryParameters url.Values, key string, defaultValue []string) []string {
+// func (a *applicationDependencies) getMultipleQueryParameters(queryParameters url.Values, key string, defaultValue []string) []string {
 
-	result := queryParameters.Get(key)
-	if result == "" {
-		return defaultValue
-	}
-	return strings.Split(result, ",")
-}
+// 	result := queryParameters.Get(key)
+// 	if result == "" {
+// 		return defaultValue
+// 	}
+// 	return strings.Split(result, ",")
+// }
 
 func (a *applicationDependencies) getSingleIntegerParameter(queryParameters url.Values, key string, defaultValue int, v *validator.Validator) int {
 
@@ -158,4 +156,17 @@ func (a *applicationDependencies) getSingleIntegerParameter(queryParameters url.
 	}
 
 	return intValue
+}
+func (a *applicationDependencies) background(fn func()) {
+	a.wg.Add(1) // Use a wait group to ensure all goroutines finish before we exit
+	go func() {
+		defer a.wg.Done() // signal goroutine is done
+		defer func() {
+			err := recover()
+			if err != nil {
+				a.logger.Error(fmt.Sprintf("%v", err))
+			}
+		}()
+		fn() // Run the actual function
+	}()
 }

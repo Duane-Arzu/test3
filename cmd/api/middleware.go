@@ -1,12 +1,17 @@
-// cmd/api/middleware.go
 package main
 
 import (
+	"errors"
 	"fmt"
-	"net"
 	"net/http"
+	"strings"
 	"sync"
+
+	"net"
 	"time"
+
+	"github.com/Duane-Arzu/test3.git/internal/data"
+	"github.com/Duane-Arzu/test3.git/internal/validator"
 
 	"golang.org/x/time/rate"
 )
@@ -81,4 +86,78 @@ func (a *applicationDependencies) rateLimit(next http.Handler) http.Handler {
 
 	})
 
+}
+
+func (a *applicationDependencies) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		authorizationHeader := r.Header.Get("Authorization")
+
+		if authorizationHeader == "" {
+			r = a.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			a.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		token := headerParts[1]
+		// Validate
+		v := validator.New()
+		data.ValidateTokenPlaintext(v, token)
+		if !v.IsEmpty() {
+			a.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Get the user info associated with this authentication token
+		user, err := a.userModel.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				a.invalidAuthenticationTokenResponse(w, r)
+			default:
+				a.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+		r = a.contextSetUser(r, user)
+
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *applicationDependencies) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		user := a.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			// Send 401 Unauthorized for anonymous users
+			a.authenticationRequiredResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *applicationDependencies) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		user := a.contextGetUser(r)
+
+		if !user.Activated {
+			// Send 403 Forbidden for users whose accounts are not activated
+			a.inactiveAccountResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+
+	// Chain the activated user check after ensuring the user is authenticated
+	return a.requireAuthenticatedUser(fn)
 }

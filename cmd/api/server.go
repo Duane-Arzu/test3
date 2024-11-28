@@ -40,7 +40,15 @@ func (a *applicationDependencies) serve() error {
 		// Create a context with timeout for shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		shutdownError <- apiServer.Shutdown(ctx)
+		err := apiServer.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+		// Wait for background tasks to complete
+		a.logger.Info("completing background tasks", "address", apiServer.Addr)
+		a.wg.Wait()
+		shutdownError <- nil
+
 	}()
 
 	// Start the server
