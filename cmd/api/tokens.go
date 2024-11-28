@@ -1,3 +1,4 @@
+// Filename: cmd/api/tokens.go
 package main
 
 import (
@@ -10,60 +11,76 @@ import (
 )
 
 func (a *applicationDependencies) createAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
+	// Define a struct to hold the incoming JSON data
 	var incomingData struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email    string `json:"email"`    // User's email
+		Password string `json:"password"` // User's password
 	}
+
+	// Parse the JSON input into the struct
 	err := a.readJSON(w, r, &incomingData)
 	if err != nil {
+		// Send a "bad request" response if the JSON is invalid
 		a.badRequestResponse(w, r, err)
 		return
 	}
+
+	// Initialize a new validator
 	v := validator.New()
 
-	data.ValidateEmail(v, incomingData.Email)
-	data.ValidatePasswordPlaintext(v, incomingData.Password)
+	// Validate the email and password fields
+	data.ValidateEmail(v, incomingData.Email)                // Check if the email is valid
+	data.ValidatePasswordPlaintext(v, incomingData.Password) // Check if the password meets criteria
 
+	// If there are validation errors, send a "failed validation" response
 	if !v.IsEmpty() {
 		a.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	// Is there an associated user for the provided email?
+
+	// Check if the email exists in the database
 	user, err := a.userModel.GetByEmail(incomingData.Email)
 	if err != nil {
 		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
+		case errors.Is(err, data.ErrRecordNotFound): // No user found for the given email
 			a.invalidCredentialsResponse(w, r)
-		default:
+		default: // Some other server error occurred
 			a.serverErrorResponse(w, r, err)
 		}
 		return
 	}
-	// The user is found. Does their password match?
+
+	// Verify if the provided password matches the stored password
 	match, err := user.Password.Matches(incomingData.Password)
 	if err != nil {
+		// Send a "server error" response if there's an issue with the password check
 		a.serverErrorResponse(w, r, err)
 		return
 	}
-	// Wrong password
-	// We will define invalidCredentialsResponse() later
+
+	// If the password does not match, send an "invalid credentials" response
 	if !match {
 		a.invalidCredentialsResponse(w, r)
 		return
 	}
+
+	// Create a new authentication token for the user
 	token, err := a.tokenModel.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {
+		// Send a "server error" response if token creation fails
 		a.serverErrorResponse(w, r, err)
 		return
 	}
 
+	// Wrap the token in an envelope to send as a JSON response
 	data := envelope{
 		"authentication_token": token,
 	}
 
-	// Return the bearer token
+	// Send the token back to the client with a "Created" (201) status
 	err = a.writeJSON(w, http.StatusCreated, data, nil)
 	if err != nil {
+		// Send a "server error" response if JSON writing fails
 		a.serverErrorResponse(w, r, err)
 	}
 }
