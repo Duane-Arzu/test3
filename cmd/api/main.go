@@ -65,9 +65,9 @@ func main() {
 	// We have port 25, 465, 587, 2525. If 25 doesn't work choose another
 	flag.IntVar(&setting.smtp.port, "smtp-port", 2525, "SMTP port")
 	// Use your Username value provided by Mailtrap
-	flag.StringVar(&setting.smtp.username, "smtp-username", "c3e1c1678d71c9", "SMTP username")
+	flag.StringVar(&setting.smtp.username, "smtp-username", "147f39f67b641b", "SMTP username")
 
-	flag.StringVar(&setting.smtp.password, "smtp-password", "38d1f200e85005", "SMTP password")
+	flag.StringVar(&setting.smtp.password, "smtp-password", "00deefca7111e6", "SMTP password")
 
 	flag.StringVar(&setting.smtp.sender, "smtp-sender", "Book Club Management Community <no-reply@commentscommunity.duanearzu.net>", "SMTP sender")
 
