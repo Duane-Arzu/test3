@@ -18,7 +18,7 @@ db/migrations/new:
 	migrate create -seq -ext=.sql -dir=./migrations ${name}
 
 
-## db/migrations/up: apply all up database migrations
+## db/migrations/up: apply all up database migration
 .PHONY: db/migrations/up
 db/migrations/up:
 	@echo 'Running up migrations...'
